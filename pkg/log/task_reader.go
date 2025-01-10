@@ -102,26 +102,36 @@ func (r *Reader) readAvailableTaskLogs(tr *v1.TaskRun) (<-chan Log, <-chan error
 	}()
 	logger.Printf("PipelineRun Log readAvailableTaskLogs start, task: %s\n", r.task)
 	if !tr.HasStarted() {
+		logger.Printf("PipelineRun Log readAvailableTaskLogs task %s has not started yet\n", r.task)
 		return nil, nil, fmt.Errorf("task %s has not started yet", r.task)
 	}
 
 	// Check if taskrun failed on start up
 	if err := hasTaskRunFailed(tr, r.task); err != nil {
+		logger.Printf("PipelineRun Log readAvailableTaskLogs task %s failed: %s\n", r.task, err)
 		if r.stream != nil {
+			logger.Printf("PipelineRun Log readAvailableTaskLogs task %s failed: %s\n", r.task, err)
 			fmt.Fprintf(r.stream.Err, "%s\n", err.Error())
 		} else {
+			logger.Printf("PipelineRun Log readAvailableTaskLogs task %s failed: %s\n", r.task, err)
 			return nil, nil, err
 		}
 	}
 
 	if tr.Status.PodName == "" {
+		logger.Printf("PipelineRun Log readAvailableTaskLogs pod for taskrun %s not available yet\n", tr.Name)
 		return nil, nil, fmt.Errorf("pod for taskrun %s not available yet", tr.Name)
 	}
 
 	podC := make(chan string)
 	go func() {
+		defer func() {
+			logger.Printf("PipelineRun Log readAvailableTaskLogs go func defer end, task: %s\n", r.task)
+		}()
+		logger.Printf("PipelineRun Log readAvailableTaskLogs go func start, task: %s\n", r.task)
 		defer close(podC)
 		if tr.Status.PodName != "" {
+			logger.Printf("PipelineRun Log readAvailableTaskLogs podC <- tr.Status.PodName, task: %s\n", r.task)
 			if len(tr.Status.RetriesStatus) != 0 {
 				for _, retryStatus := range tr.Status.RetriesStatus {
 					podC <- retryStatus.PodName
