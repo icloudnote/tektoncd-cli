@@ -16,6 +16,7 @@ package pipelinerun
 
 import (
 	"fmt"
+	logger "log"
 	"os"
 	"strings"
 
@@ -74,6 +75,7 @@ Show the logs of PipelineRun named 'microservice-1' for all Tasks and steps (inc
 				Err: cmd.OutOrStderr(),
 			}
 
+			logger.Println("PipelineRun Log logCommand start")
 			return Run(opts)
 		},
 	}
@@ -111,21 +113,27 @@ func Run(opts *options.LogOptions) error {
 		return err
 	}
 
+	logger.Println("PipelineRun Log Run NewWriter start")
 	log.NewWriter(log.LogTypePipeline, opts.Prefixing).WithDisplayName(opts.DisplayName).Write(opts.Stream, logC, errC)
+	logger.Println("PipelineRun Log Run NewWriter end")
 
 	// get pipelinerun status
 	if opts.ExitWithPrError {
 		clients, err := opts.Params.Clients()
 		if err != nil {
+			logger.Println("PipelineRun Log Run NewWriter opts.Params.Clients end")
 			return err
 		}
 		pr, err := pipelinerunpkg.GetPipelineRun(pipelineRunGroupResource, clients, opts.PipelineRunName, opts.Params.Namespace())
 		if err != nil {
+			logger.Println("PipelineRun Log Run NewWriter pipelinerunpkg.GetPipelineRun end")
 			return err
 		}
+		logger.Println("PipelineRun Log Run NewWriter opts.ExitWithPrError end")
 		os.Exit(prStatusToUnixStatus(pr))
 	}
 
+	logger.Println("PipelineRun Log Run end")
 	return nil
 }
 

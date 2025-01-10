@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	logger "log"
 	"sync"
 	"time"
 
@@ -71,6 +72,7 @@ func NewWithDefaults(name, ns string, client k8s.Interface) *Pod {
 
 // Wait wait for the pod to get up and running
 func (p *Pod) Wait() (*corev1.Pod, error) {
+	logger.Println("PipelineRun Log Wait start")
 	// ensure pod exists before we actually check for it
 	if _, err := p.Get(); err != nil {
 		return nil, err
@@ -86,7 +88,9 @@ func (p *Pod) Wait() (*corev1.Pod, error) {
 		mu.Unlock()
 	}()
 
+	logger.Println("PipelineRun Log Wait watcher start")
 	p.watcher(stopC, eventC, &mu)
+	logger.Println("PipelineRun Log Wait watcher end")
 
 	var pod *corev1.Pod
 	var err error
@@ -96,11 +100,12 @@ func (p *Pod) Wait() (*corev1.Pod, error) {
 			break
 		}
 	}
-
+	logger.Println("PipelineRun Log Wait end")
 	return pod, err
 }
 
 func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync.Mutex) {
+	logger.Println("PipelineRun Log watcher")
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		p.Kc, time.Second*10,
 		informers.WithNamespace(p.Ns),
@@ -116,6 +121,7 @@ func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync
 					return
 				default:
 					// default is used to avoid pseudo-random selection of multiple matching cases
+					logger.Printf("Pod added: %s", obj.(*corev1.Pod).Name)
 					eventC <- obj
 				}
 			},
@@ -126,6 +132,7 @@ func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync
 				case <-stopC:
 					return
 				default:
+					logger.Printf("Pod update: %s", newObj.(*corev1.Pod).Name)
 					eventC <- newObj
 				}
 			},
@@ -136,6 +143,7 @@ func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync
 				case <-stopC:
 					return
 				default:
+					logger.Printf("Pod delete: %s", obj.(*corev1.Pod).Name)
 					eventC <- obj
 				}
 			},
@@ -144,8 +152,11 @@ func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync
 		return
 	}
 
+	logger.Println("PipelineRun Log watcher start")
 	factory.Start(stopC)
+	logger.Println("PipelineRun Log watcher start end")
 	factory.WaitForCacheSync(stopC)
+	logger.Println("PipelineRun Log watcher WaitForCacheSync end")
 }
 
 func podOpts(name string) func(opts *metav1.ListOptions) {

@@ -16,6 +16,7 @@ package log
 
 import (
 	"fmt"
+	logger "log"
 	"sync"
 	"time"
 
@@ -44,12 +45,19 @@ func (r *Reader) readPipelineLog() (<-chan Log, <-chan error, error) {
 }
 
 func (r *Reader) readLivePipelineLogs(pr *v1.PipelineRun) (<-chan Log, <-chan error, error) {
+	logger.Println("PipelineRun Log readLivePipelineLogs")
 	logC := make(chan Log)
 	errC := make(chan error)
 
 	go func() {
-		defer close(logC)
-		defer close(errC)
+		defer func() {
+			logger.Println("PipelineRun Log readLivePipelineLogs logC close")
+			close(logC)
+		}()
+		defer func() {
+			logger.Println("PipelineRun Log readLivePipelineLogs errC close")
+			close(errC)
+		}()
 
 		prTracker := pipelinerunpkg.NewTracker(pr.Name, r.ns, r.clients)
 		trC := prTracker.Monitor(r.tasks)
@@ -58,12 +66,17 @@ func (r *Reader) readLivePipelineLogs(pr *v1.PipelineRun) (<-chan Log, <-chan er
 		taskIndex := 0
 
 		for trs := range trC {
+			logger.Printf("PipelineRun Log readLivePipelineLogs trs range, len(trs): %d\n", len(trs))
 			wg.Add(len(trs))
 
 			for _, run := range trs {
+				logger.Printf("PipelineRun Log readLivePipelineLogs trs range, start run: %s\n", run.Name)
 				taskIndex++
 				// NOTE: passing tr, taskIdx to avoid data race
 				go func(tr taskrunpkg.Run, taskNum int) {
+					defer func() {
+						logger.Printf("PipelineRun Log readLivePipelineLogs trs range, end run: %s\n, taskNum: %d", run.Name, taskNum)
+					}()
 					defer wg.Done()
 
 					// clone the object to keep task number and name separately
@@ -74,7 +87,9 @@ func (r *Reader) readLivePipelineLogs(pr *v1.PipelineRun) (<-chan Log, <-chan er
 			}
 		}
 
+		logger.Println("PipelineRun Log readLivePipelineLogs wg.Wait() before")
 		wg.Wait()
+		logger.Println("PipelineRun Log readLivePipelineLogs wg.Wait() after")
 
 		if !empty(pr.Status) && pr.Status.Conditions[0].Status == corev1.ConditionFalse {
 			errC <- fmt.Errorf("%s", pr.Status.Conditions[0].Message)
@@ -112,6 +127,7 @@ func (r *Reader) readAvailablePipelineLogs(pr *v1.PipelineRun) (<-chan Log, <-ch
 
 		// clone the object to keep task number and name separately
 		c := r.clone()
+		// todo: 获取每个task的日志
 		for i, tr := range taskRuns {
 			c.setUpTask(i+1, tr)
 			c.pipeLogs(logC, errC)
@@ -179,6 +195,11 @@ func (r *Reader) waitUntilAvailable() error {
 }
 
 func (r *Reader) pipeLogs(logC chan<- Log, errC chan<- error) {
+	logger.Println("PipelineRun Log pipeLogs start")
+	defer func() {
+		logger.Println("PipelineRun Log pipeLogs end")
+	}()
+
 	tlogC, terrC, err := r.readTaskLog()
 	if err != nil {
 		errC <- err
@@ -192,6 +213,7 @@ func (r *Reader) pipeLogs(logC chan<- Log, errC chan<- error) {
 				tlogC = nil
 				continue
 			}
+			// todo: 获取日志
 			logC <- Log{Task: l.Task, TaskDisplayName: l.TaskDisplayName, Step: l.Step, Log: l.Log}
 
 		case e, ok := <-terrC:
@@ -200,6 +222,7 @@ func (r *Reader) pipeLogs(logC chan<- Log, errC chan<- error) {
 				continue
 			}
 			errC <- fmt.Errorf("failed to get logs for task %s : %s", r.task, e)
+			logger.Println("PipelineRun Log pipeLogs terrC")
 		}
 	}
 }

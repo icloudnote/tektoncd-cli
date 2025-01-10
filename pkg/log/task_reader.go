@@ -16,6 +16,7 @@ package log
 
 import (
 	"fmt"
+	logger "log"
 	"strings"
 	"sync"
 	"time"
@@ -45,13 +46,19 @@ func (s *step) hasStarted() bool {
 }
 
 func (r *Reader) readTaskLog() (<-chan Log, <-chan error, error) {
+	logger.Println("PipelineRun Log readTaskLog start")
+	defer func() {
+		logger.Println("PipelineRun Log readTaskLog end")
+	}()
 	tr, err := taskrunpkg.GetTaskRun(taskrunGroupResource, r.clients, r.run, r.ns)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %s", MsgTRNotFoundErr, err)
 	}
 
 	r.formTaskName(tr)
+	// todo: 如果 pod 不存在, 这个时候获取日志的时候就会出错了.
 
+	// todo: xxxx
 	if !tr.IsDone() && r.follow {
 		return r.readLiveTaskLogs(tr)
 	}
@@ -77,6 +84,10 @@ func (r *Reader) formTaskName(tr *v1.TaskRun) {
 }
 
 func (r *Reader) readLiveTaskLogs(tr *v1.TaskRun) (<-chan Log, <-chan error, error) {
+	defer func() {
+		logger.Printf("PipelineRun Log readLiveTaskLogs end, task: %s\n", r.task)
+	}()
+	logger.Printf("PipelineRun Log readLiveTaskLogs start, task: %s\n", r.task)
 	podC, podErrC, err := r.getTaskRunPodNames(tr)
 	if err != nil {
 		return nil, nil, err
@@ -86,6 +97,10 @@ func (r *Reader) readLiveTaskLogs(tr *v1.TaskRun) (<-chan Log, <-chan error, err
 }
 
 func (r *Reader) readAvailableTaskLogs(tr *v1.TaskRun) (<-chan Log, <-chan error, error) {
+	defer func() {
+		logger.Printf("PipelineRun Log readAvailableTaskLogs end, task: %s\n", r.task)
+	}()
+	logger.Printf("PipelineRun Log readAvailableTaskLogs start, task: %s\n", r.task)
 	if !tr.HasStarted() {
 		return nil, nil, fmt.Errorf("task %s has not started yet", r.task)
 	}
@@ -121,13 +136,19 @@ func (r *Reader) readAvailableTaskLogs(tr *v1.TaskRun) (<-chan Log, <-chan error
 }
 
 func (r *Reader) readStepsLogs(logC chan<- Log, errC chan<- error, steps []*step, pod *pods.Pod, follow, timestamps bool) {
+	defer func() {
+		logger.Println("PipelineRun Log readStepsLogs defer start")
+	}()
 	for _, step := range steps {
+		logger.Println("PipelineRun Log readStepsLogs start, " + step.name)
 		if !follow && !step.hasStarted() {
 			continue
 		}
 
 		container := pod.Container(step.container)
+		// todo: 这个地方返回的是一个channel
 		containerLogC, containerLogErrC, err := container.LogReader(follow, timestamps).Read()
+		// todo: 如果获取日志的时候出错, 这个不会走
 		if err != nil {
 			errC <- fmt.Errorf("error in getting logs for step %s: %s", step.name, err)
 			continue
@@ -141,6 +162,7 @@ func (r *Reader) readStepsLogs(logC chan<- Log, errC chan<- error, steps []*step
 					logC <- Log{Task: r.task, TaskDisplayName: r.displayName, Step: step.name, Log: "EOFLOG"}
 					continue
 				}
+				// todo: 实时写入日志,
 				logC <- Log{Task: r.task, TaskDisplayName: r.displayName, Step: step.name, Log: l.Log}
 
 			case e, ok := <-containerLogErrC:
@@ -161,6 +183,10 @@ func (r *Reader) readStepsLogs(logC chan<- Log, errC chan<- error, steps []*step
 }
 
 func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, timestamps bool) (<-chan Log, <-chan error) {
+	logger.Println("PipelineRun Log readPodLogs start, task: " + r.task)
+	defer func() {
+		logger.Println("PipelineRun Log readPodLogs defer end, task: " + r.task)
+	}()
 	logC := make(chan Log)
 	errC := make(chan error)
 	var wg sync.WaitGroup
@@ -176,10 +202,13 @@ func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, t
 		wg.Done()
 
 		// wait for all goroutines to close before closing errC channel
+		logger.Println("PipelineRun Log readPodLogs Wait start")
 		wg.Wait()
+		logger.Println("PipelineRun Log readPodLogs Wait end")
 		close(errC)
 	}()
 
+	// todo: 这个地方卡在了, 一直没有返回
 	wg.Add(1)
 	go func() {
 		defer func() {
@@ -194,17 +223,21 @@ func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, t
 
 			if follow {
 				pod, err = p.Wait()
+				logger.Println("PipelineRun Log readPodLogs go func Wait end")
 			} else {
 				pod, err = p.Get()
+				logger.Println("PipelineRun Log readPodLogs Get end")
 			}
 			if err != nil {
 				errC <- fmt.Errorf("task %s failed: %s. Run tkn tr desc %s for more details", r.task, strings.TrimSpace(err.Error()), r.run)
 			}
 			steps := filterSteps(pod, r.allSteps, r.steps)
 			r.readStepsLogs(logC, errC, steps, p, follow, timestamps)
+			logger.Println("PipelineRun Log readPodLogs go func end")
 		}
 	}()
 
+	logger.Println("PipelineRun Log readPodLogs end")
 	return logC, errC
 }
 
@@ -213,6 +246,10 @@ func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, t
 // and keep checking the status until the taskrun completes
 // or the timeout is reached.
 func (r *Reader) getTaskRunPodNames(run *v1.TaskRun) (<-chan string, <-chan error, error) {
+	logger.Printf("PipelineRun Log getTaskRunPodNames start, task: %s\n", r.task)
+	defer func() {
+		logger.Printf("PipelineRun Log getTaskRunPodNames end, task: %s\n", r.task)
+	}()
 	opts := metav1.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.run).String(),
 	}
@@ -227,10 +264,12 @@ func (r *Reader) getTaskRunPodNames(run *v1.TaskRun) (<-chan string, <-chan erro
 
 	go func() {
 		defer func() {
+			logger.Printf("PipelineRun Log getTaskRunPodNames go func defer end, task: %s\n", r.task)
 			close(podC)
 			close(errC)
 			watchRun.Stop()
 		}()
+		logger.Printf("PipelineRun Log getTaskRunPodNames go func start, task: %s\n", r.task)
 
 		podMap := make(map[string]bool)
 		addPod := func(name string) {

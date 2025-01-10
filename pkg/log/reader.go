@@ -16,6 +16,7 @@ package log
 
 import (
 	"fmt"
+	logger "log"
 	"time"
 
 	"github.com/tektoncd/cli/pkg/cli"
@@ -84,6 +85,7 @@ func NewReader(logType string, opts *options.LogOptions) (*Reader, error) {
 }
 
 func (r *Reader) Read() (<-chan Log, <-chan error, error) {
+	logger.Println("PipelineRun Log read")
 	switch r.logType {
 	case LogTypePipeline:
 		return r.readPipelineLog()

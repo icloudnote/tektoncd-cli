@@ -16,6 +16,7 @@ package log
 
 import (
 	"fmt"
+	logger "log"
 
 	"github.com/tektoncd/cli/pkg/cli"
 	"github.com/tektoncd/cli/pkg/formatted"
@@ -46,6 +47,7 @@ func (lw *Writer) WithDisplayName(displayName bool) *Writer {
 
 // Write formatted pod's logs
 func (lw *Writer) Write(s *cli.Stream, logC <-chan Log, errC <-chan error) {
+	logger.Println("PipelineRun Log Write start")
 	for logC != nil || errC != nil {
 		select {
 		case l, ok := <-logC:
@@ -81,4 +83,6 @@ func (lw *Writer) Write(s *cli.Stream, logC <-chan Log, errC <-chan error) {
 			lw.fmt.Error(s.Err, "%s\n", e)
 		}
 	}
+	// todo: 这个地方有问题, 卡在了.
+	logger.Println("PipelineRun Log Write end")
 }
