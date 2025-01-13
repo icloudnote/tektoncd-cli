@@ -152,7 +152,10 @@ func (r *Reader) readStepsLogs(logC chan<- Log, errC chan<- error, steps []*step
 		logger.Printf("PipelineRun Log readStepsLogs defer end, task: %s\n", r.task)
 	}()
 	for _, step := range steps {
-		logger.Println("PipelineRun Log readStepsLogs start, " + step.name)
+		logger.Printf("PipelineRun Log readStepsLogs start, step: %s\n", step.name)
+		defer func() {
+			logger.Printf("PipelineRun Log readStepsLogs defer end, step: %s\n", step.name)
+		}()
 		if !follow && !step.hasStarted() {
 			continue
 		}

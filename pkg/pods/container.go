@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	logger "log"
 
 	"github.com/tektoncd/cli/pkg/pods/stream"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,10 @@ type Container struct {
 }
 
 func (c *Container) Status() error {
+	logger.Printf("Container start Status %s", c.name)
+	defer func() {
+		logger.Printf("Container end Status %s end", c.name)
+	}()
 	pod, err := c.pod.Get()
 	if err != nil {
 		return err
