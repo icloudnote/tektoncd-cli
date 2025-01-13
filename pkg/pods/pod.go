@@ -133,7 +133,7 @@ func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync
 					return
 				default:
 					logger.Printf("Pod update: %s", newObj.(*corev1.Pod).Name)
-					logger.Printf("Pod update: %+v", newObj.(*corev1.Pod).Status)
+					logger.Printf("Pod update: %+v", newObj.(*corev1.Pod).Status.Phase)
 					eventC <- newObj
 				}
 			},
@@ -176,6 +176,7 @@ func checkPodStatus(obj interface{}) (*corev1.Pod, error) {
 		return pod, fmt.Errorf("failed to run the pod %s ", pod.Name)
 	}
 
+	logger.Printf("Pod status: %s", pod.Status.Phase)
 	if pod.Status.Phase == corev1.PodSucceeded ||
 		pod.Status.Phase == corev1.PodRunning ||
 		pod.Status.Phase == corev1.PodFailed {
