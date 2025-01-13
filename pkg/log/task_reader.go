@@ -247,7 +247,7 @@ func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, t
 			if follow {
 				logger.Printf("PipelineRun Log readPodLogs go func Wait start, ....podName: %s\n", podName)
 				pod, err = p.Wait()
-				logger.Println("PipelineRun Log readPodLogs go func Wait end")
+				logger.Printf("PipelineRun Log readPodLogs go func Wait end, ....podName: %s\n", podName)
 			} else {
 				logger.Printf("PipelineRun Log readPodLogs go func Get start, ....podName: %s\n", podName)
 				pod, err = p.Get()
