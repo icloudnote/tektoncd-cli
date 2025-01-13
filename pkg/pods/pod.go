@@ -133,7 +133,7 @@ func (p *Pod) watcher(stopC <-chan struct{}, eventC chan<- interface{}, mu *sync
 					return
 				default:
 					logger.Printf("Pod update: %s", newObj.(*corev1.Pod).Name)
-					logger.Printf("Pod update: %+v", newObj.(*corev1.Pod))
+					logger.Printf("Pod update: %+v", newObj.(*corev1.Pod).Status)
 					eventC <- newObj
 				}
 			},
