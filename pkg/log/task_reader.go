@@ -46,6 +46,7 @@ func (s *step) hasStarted() bool {
 }
 
 func (r *Reader) readTaskLog() (<-chan Log, <-chan error, error) {
+	// 这个地方channel 没有关闭
 	logger.Println("PipelineRun Log readTaskLog start")
 	defer func() {
 		logger.Println("PipelineRun Log readTaskLog end")
@@ -146,8 +147,9 @@ func (r *Reader) readAvailableTaskLogs(tr *v1.TaskRun) (<-chan Log, <-chan error
 }
 
 func (r *Reader) readStepsLogs(logC chan<- Log, errC chan<- error, steps []*step, pod *pods.Pod, follow, timestamps bool) {
+	logger.Printf("PipelineRun Log readStepsLogs start, task: %s\n", r.task)
 	defer func() {
-		logger.Println("PipelineRun Log readStepsLogs defer start")
+		logger.Printf("PipelineRun Log readStepsLogs defer end, task: %s\n", r.task)
 	}()
 	for _, step := range steps {
 		logger.Println("PipelineRun Log readStepsLogs start, " + step.name)
@@ -203,9 +205,17 @@ func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, t
 
 	wg.Add(1)
 	go func() {
+		// todo: 这个地方可能有问题 ===========
+		logger.Printf("PipelineRun Log readPodLogs go func defer start, task2: %s\n", r.task)
+		defer func() {
+			// todo: 这个地方没有执行到
+			logger.Printf("PipelineRun Log readPodLogs go func defer end, task2: %s\n", r.task)
+		}()
+
 		// forward pod error to error stream
 		if podErrC != nil {
 			for podErr := range podErrC {
+				logger.Printf("PipelineRun Log readPodLogs go func podErrC range, task: %s, error: %s\n", r.task, podErr)
 				errC <- podErr
 			}
 		}
@@ -218,23 +228,28 @@ func (r *Reader) readPodLogs(podC <-chan string, podErrC <-chan error, follow, t
 		close(errC)
 	}()
 
-	// todo: 这个地方卡在了, 一直没有返回
+	// todo: 这个地方卡在了, 一直没有返回 ===========
 	wg.Add(1)
 	go func() {
+		logger.Printf("PipelineRun Log readPodLogs go func start, task: %s\n", r.task)
 		defer func() {
+			logger.Printf("PipelineRun Log readPodLogs go func defer start, task: %s\n", r.task)
 			close(logC)
 			wg.Done()
 		}()
 
 		for podName := range podC {
+			logger.Printf("PipelineRun Log readPodLogs go func range, podName: %s\n", podName)
 			p := pods.New(podName, r.ns, r.clients.Kube, r.streamer)
 			var pod *corev1.Pod
 			var err error
 
 			if follow {
+				logger.Printf("PipelineRun Log readPodLogs go func Wait start, ....podName: %s\n", podName)
 				pod, err = p.Wait()
 				logger.Println("PipelineRun Log readPodLogs go func Wait end")
 			} else {
+				logger.Printf("PipelineRun Log readPodLogs go func Get start, ....podName: %s\n", podName)
 				pod, err = p.Get()
 				logger.Println("PipelineRun Log readPodLogs Get end")
 			}
@@ -274,10 +289,12 @@ func (r *Reader) getTaskRunPodNames(run *v1.TaskRun) (<-chan string, <-chan erro
 
 	go func() {
 		defer func() {
+			// todo: 这个地方有日志, 说明 channel 已经关闭了
 			logger.Printf("PipelineRun Log getTaskRunPodNames go func defer end, task: %s\n", r.task)
 			close(podC)
 			close(errC)
 			watchRun.Stop()
+			logger.Printf("PipelineRun Log getTaskRunPodNames go func defer end222, task: %s\n", r.task)
 		}()
 		logger.Printf("PipelineRun Log getTaskRunPodNames go func start, task: %s\n", r.task)
 
@@ -338,8 +355,17 @@ func (r *Reader) getTaskRunPodNames(run *v1.TaskRun) (<-chan string, <-chan erro
 }
 
 func filterSteps(pod *corev1.Pod, allSteps bool, stepsGiven []string) []*step {
+	logger.Printf("PipelineRun Log filterSteps start, allSteps: %v, stepsGiven: %v\n", allSteps, stepsGiven)
+	defer func() {
+		logger.Printf("PipelineRun Log filterSteps end, allSteps: %v, stepsGiven: %v\n", allSteps, stepsGiven)
+	}()
+
 	steps := []*step{}
 	stepsInPod := getSteps(pod)
+	logger.Printf("PipelineRun Log filterSteps stepsInPod: %+v\n", stepsInPod)
+	for _, item := range stepsInPod {
+		logger.Printf("PipelineRun Log filterSteps stepsInPod item: %+v\n", item)
+	}
 
 	if allSteps {
 		steps = append(steps, getInitSteps(pod)...)

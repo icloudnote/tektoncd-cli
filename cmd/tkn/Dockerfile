@@ -5,8 +5,9 @@ ENV GOPROXY=https://goproxy.verystar.net,https://goproxy.cn,direct \
     GOPRIVATE="" \
     GONOSUMDB="git.verystar.cn" \
     GOSUMDB="sum.golang.google.cn"
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app ./cmd/tkn
+#COPY . .
+#RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app ./cmd/tkn
+COPY app .
 
 
 # stage two

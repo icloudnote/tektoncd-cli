@@ -75,6 +75,7 @@ func (r *Reader) readLivePipelineLogs(pr *v1.PipelineRun) (<-chan Log, <-chan er
 				// NOTE: passing tr, taskIdx to avoid data race
 				go func(tr taskrunpkg.Run, taskNum int) {
 					defer func() {
+						// todo: 这个地方未执行
 						logger.Printf("PipelineRun Log readLivePipelineLogs trs range, end run: %s\n, taskNum: %d", run.Name, taskNum)
 					}()
 					defer wg.Done()
@@ -197,6 +198,7 @@ func (r *Reader) waitUntilAvailable() error {
 func (r *Reader) pipeLogs(logC chan<- Log, errC chan<- error) {
 	logger.Println("PipelineRun Log pipeLogs start")
 	defer func() {
+		// todo: 这个地方未执行
 		logger.Println("PipelineRun Log pipeLogs end")
 	}()
 
