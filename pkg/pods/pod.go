@@ -79,13 +79,15 @@ func (p *Pod) Wait() (*corev1.Pod, error) {
 	}
 
 	stopC := make(chan struct{})
-	eventC := make(chan interface{})
+	eventC := make(chan interface{}, 10)
 	mu := sync.Mutex{}
 	defer func() {
+		logger.Printf("PipelineRun Log Wait close stopC and eventC")
 		mu.Lock()
 		close(stopC)
 		close(eventC)
 		mu.Unlock()
+		logger.Printf("PipelineRun Log Wait close stopC and eventC end")
 	}()
 
 	logger.Println("PipelineRun Log Wait watcher start")
@@ -95,6 +97,7 @@ func (p *Pod) Wait() (*corev1.Pod, error) {
 	var pod *corev1.Pod
 	var err error
 	for e := range eventC {
+		// todo: 这个地方可能有问题
 		pod, err = checkPodStatus(e)
 		if pod != nil || err != nil {
 			break
@@ -176,7 +179,7 @@ func checkPodStatus(obj interface{}) (*corev1.Pod, error) {
 		return pod, fmt.Errorf("failed to run the pod %s ", pod.Name)
 	}
 
-	logger.Printf("Pod status: %s", pod.Status.Phase)
+	logger.Printf("Pod name: %s, status: %s", pod.Name, pod.Status.Phase)
 	if pod.Status.Phase == corev1.PodSucceeded ||
 		pod.Status.Phase == corev1.PodRunning ||
 		pod.Status.Phase == corev1.PodFailed {
@@ -191,7 +194,7 @@ func checkPodStatus(obj interface{}) (*corev1.Pod, error) {
 			}
 		}
 	}
-
+	logger.Printf("Pod %s is not ready yet", pod.Name)
 	return nil, nil
 }
 
